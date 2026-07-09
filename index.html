@@ -258,7 +258,7 @@
     <div class="stat-card"><div class="num" id="sum-rank">首位T</div><div class="label">セ・リーグ順位</div></div>
     <div class="stat-card"><div class="num" id="sum-wins">39勝</div><div class="label" id="sum-ld">33敗 1分</div></div>
     <div class="stat-card"><div class="num" id="sum-pct">.542</div><div class="label">勝率</div></div>
-    <div class="stat-card"><div class="num" id="sum-games">73</div><div class="label">試合消化</div></div>
+    <div class="stat-card"><div class="num" id="sum-games">73</div><div class="label" id="sum-games-label">試合消化（残り70試合）</div></div>
   </div>
 
   <table>
@@ -572,7 +572,15 @@ const lyricsLinks = {
 
 function renderPlayers(list, containerId) {
   const container = document.getElementById(containerId);
-  list.forEach((p, i) => {
+  // 背番号順（番号不明の選手は最後に名前順）
+  const sorted = [...list].sort((a, b) => {
+    const na = parseInt(a.number), nb = parseInt(b.number);
+    if (isNaN(na) && isNaN(nb)) return a.name.localeCompare(b.name, "ja");
+    if (isNaN(na)) return 1;
+    if (isNaN(nb)) return -1;
+    return na - nb;
+  });
+  sorted.forEach((p, i) => {
     const card = document.createElement('div');
     card.className = 'player-card';
     let songBtn = songPlayers.has(p.name)
@@ -658,6 +666,11 @@ async function updateStandings() {
       document.getElementById("sum-ld").textContent = `${cells[3]}敗 ${cells[4]}分`;
       document.getElementById("sum-pct").textContent = cells[5];
       document.getElementById("sum-games").textContent = cells[1];
+      const played = parseInt(cells[1], 10);
+      if (!isNaN(played)) {
+        document.getElementById("sum-games-label").textContent =
+          `試合消化（残り${143 - played}試合）`; // レギュラーシーズンは143試合
+      }
     }
   });
 }
