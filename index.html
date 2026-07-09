@@ -212,6 +212,43 @@
     border-top: 2px solid var(--tigers-yellow);
     margin-top: 40px;
   }
+
+  /* 表は狭い画面で横スクロール */
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 8px;
+  }
+  .table-wrap table { min-width: 500px; }
+
+  /* スマホ向け調整 */
+  @media (max-width: 600px) {
+    header { padding: 20px 12px 14px; }
+    header h1 { font-size: 1.45rem; letter-spacing: 0.02em; }
+    header p { font-size: 0.78rem; }
+    .container { padding: 16px 10px; }
+    h2 { font-size: 1.15rem; margin: 24px 0 12px; }
+    .matchup { font-size: 1.25rem; }
+    .matchup .vs { margin: 0 8px; }
+    .game-detail { font-size: 0.85rem; }
+    .broadcast { font-size: 0.75rem; line-height: 1.9; }
+    .standings-summary { gap: 8px; }
+    .stat-card { padding: 10px 8px; min-width: calc(50% - 8px); }
+    .stat-card .num { font-size: 1.45rem; }
+    .stat-card .label { font-size: 0.7rem; }
+    th, td { padding: 6px 4px; font-size: 0.78rem; }
+    .players { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .avatar { height: 96px; }
+    .avatar .initials { font-size: 1.7rem; }
+    .avatar .number { font-size: 0.85rem; }
+    .player-info { padding: 8px 10px 10px; }
+    .player-info .name { font-size: 0.9rem; }
+    .player-info .stats { font-size: 0.72rem; }
+    .song-link { font-size: 0.7rem; padding: 3px 8px; }
+    #modal { padding: 18px 16px; max-height: 88vh; }
+    #modal h3 { font-size: 1.2rem; }
+    #modal p { font-size: 0.85rem; }
+  }
 </style>
 </head>
 <body>
@@ -239,7 +276,8 @@
     </div>
   </div>
 
-  <table style="margin-top:14px;">
+  <div class="table-wrap" style="margin-top:14px;">
+  <table>
     <thead>
       <tr><th>日付</th><th>対戦カード</th><th>球場</th><th>開始</th></tr>
     </thead>
@@ -252,6 +290,7 @@
       <tr><td>7/12（日）</td><td>阪神 - ヤクルト</td><td>甲子園</td><td>18:00</td></tr>
     </tbody>
   </table>
+  </div>
 
   <h2>今シーズンの成績</h2>
   <div class="standings-summary">
@@ -261,6 +300,7 @@
     <div class="stat-card"><div class="num" id="sum-games">73</div><div class="label" id="sum-games-label">試合消化（残り70試合）</div></div>
   </div>
 
+  <div class="table-wrap">
   <table>
     <thead>
       <tr><th>順位</th><th>チーム</th><th>試合</th><th>勝</th><th>負</th><th>分</th><th>勝率</th><th>差</th></tr>
@@ -274,6 +314,7 @@
       <tr><td>6</td><td>中日ドラゴンズ</td><td>76</td><td>29</td><td>46</td><td>1</td><td>.387</td><td>11.5</td></tr>
     </tbody>
   </table>
+  </div>
 
   <h2>野手陣</h2>
   <div class="players" id="batters"></div>
