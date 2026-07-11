@@ -17,6 +17,19 @@
     background: var(--tigers-black);
     color: var(--tigers-white);
   }
+  /* 甲子園の写真を固定背景に（スクロールしても動かない） */
+  #bg {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: url("bg.jpg") center / cover no-repeat var(--tigers-black);
+  }
+  #bg::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(5, 5, 10, 0.48); /* 文字を読みやすくする暗幕 */
+  }
   header {
     background: repeating-linear-gradient(90deg,
       var(--tigers-black) 0 40px, #111 40px 80px);
@@ -252,6 +265,7 @@
 </style>
 </head>
 <body>
+<div id="bg"></div>
 
 <header>
   <h1>🐯 阪神タイガース 特設ページ</h1>
