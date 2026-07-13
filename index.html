@@ -876,27 +876,32 @@ async function fetchMdFresh(url) {
   return await res.text();
 }
 
+const TEAM_CODE = "t"; // NPBの試合URLに使われる阪神のチームコード
+
 async function updateLive() {
   const md = await fetchMdFresh("https://npb.jp/scores/");
-  // 「[... 阪神 ... 2-1 （甲子園） 9回裏](詳細URL)」形式の行を探す
-  const line = md.split("\n").find(l =>
-    l.includes("阪神") && /\]\(https:\/\/npb\.jp\/scores\/\d{4}\/\d{4}\//.test(l));
+  // 全試合URLからチームコードで自チームの試合を特定し、最新の日付を選ぶ
+  const re = /https:\/\/npb\.jp\/scores\/(\d{4})\/(\d{4})\/([a-z0-9]+)-([a-z0-9]+)-\d+\//g;
+  let m, best = null;
+  while ((m = re.exec(md)) !== null) {
+    if (m[3] !== TEAM_CODE && m[4] !== TEAM_CODE) continue;
+    if (!best || m[2] > best.mmdd) best = { url: m[0], mmdd: m[2] };
+  }
   const section = document.getElementById("live-section");
-  if (!line) { section.style.display = "none"; return; }
+  if (!best) { section.style.display = "none"; return; }
 
-  const urlMatch = line.match(/\]\((https:\/\/npb\.jp\/scores\/[^\)]+)\)/);
-  const statusMatch = line.match(/（([^）]+)）\s*([^\]]*)\]/);
-  const scoreMatch = line.match(/(\d+)\s*-\s*(\d+)/);
-  const status = statusMatch ? statusMatch[2].trim() : "";
-
-  section.style.display = "";
-  document.getElementById("live-status").textContent =
-    (statusMatch ? statusMatch[1].replace(/\s+/g, "") + "球場 ｜ " : "") +
-    (status || "試合前");
-
-  // 詳細ページからイニングスコアを取得
+  let status = "";
+  // 詳細ページから状況とイニングスコアを取得
   try {
-    const detail = await fetchMdFresh(urlMatch[1]);
+    const detail = await fetchMdFresh(best.url);
+    // 「【試合終了】」「【5回裏】」などの状況表示
+    const statusM = detail.match(/【((?:[0-9０-９]+回[表裏]?|試合終了|試合前|試合中断|中止|ノーゲーム|サスペンデッド)[^】]*)】/);
+    status = statusM ? statusM[1] : "";
+    // 「2026年7月12日（日）甲子園」の行から日付と球場名
+    const dateM = detail.match(/\d+年(\d+)月(\d+)日（[^）]+）\s*(\S+)/);
+    section.style.display = "";
+    document.getElementById("live-status").textContent =
+      (dateM ? `${dateM[1]}/${dateM[2]} ${dateM[3]} ｜ ` : "") + (status || "試合前");
     const tables = parseMdTables(detail);
     const lineScore = tables.find(t =>
       t[0] && t[0].includes("計") && t[0].includes("H") && t[0].includes("E"));
@@ -923,11 +928,18 @@ async function updateLive() {
         `<span class="team ${homeName.includes("阪神") ? "tigers-name" : ""}">${homeName} ${home[total]}</span>` +
         `<span class="vs">-</span>` +
         `<span class="team ${awayName.includes("阪神") ? "tigers-name" : ""}">${away[total]} ${awayName}</span>`;
-    } else if (scoreMatch) {
-      document.getElementById("live-score").textContent = `${scoreMatch[1]} - ${scoreMatch[2]}`;
+    } else {
+      // 試合前などスコア表がない場合は対戦カードを表示
+      const vsM = detail.match(/###\s*[^\n]*?(\S+)\s+vs\s+(\S+)/);
+      document.getElementById("live-score").textContent =
+        vsM ? `${vsM[1]} vs ${vsM[2]}` : "試合前";
+      document.getElementById("live-innings-head").innerHTML = "";
+      document.getElementById("live-innings-body").innerHTML = "";
     }
   } catch (e) {
-    if (scoreMatch) document.getElementById("live-score").textContent = `${scoreMatch[1]} - ${scoreMatch[2]}`;
+    console.warn("速報詳細の取得に失敗:", e);
+    section.style.display = "none";
+    return;
   }
 
   const now = new Date();
