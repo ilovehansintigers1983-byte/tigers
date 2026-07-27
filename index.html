@@ -126,7 +126,7 @@
     box-shadow: 0 6px 16px rgba(255,226,1,0.25);
   }
   .avatar {
-    height: 130px;
+    aspect-ratio: 1 / 1; /* 選手写真が正方形なので枠も正方形にして顔が切れないようにする */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -148,7 +148,7 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
-    object-position: top center;
+    object-position: center;
     background: #1a1a1a;
   }
   .avatar .number {
@@ -261,7 +261,7 @@
     .stat-card .label { font-size: 0.7rem; }
     th, td { padding: 6px 4px; font-size: 0.78rem; }
     .players { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-    .avatar { height: 96px; }
+    /* .avatar は aspect-ratio で正方形を維持（高さ指定なし） */
     .avatar .initials { font-size: 1.7rem; }
     .avatar .number { font-size: 0.85rem; }
     .player-info { padding: 8px 10px 10px; }
