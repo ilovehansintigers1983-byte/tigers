@@ -141,6 +141,16 @@
     color: var(--tigers-yellow);
     text-shadow: 2px 2px 0 #000;
   }
+  /* 球団公式の選手写真（読み込めない場合はイニシャル表示にフォールバック） */
+  .avatar .photo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+    background: #1a1a1a;
+  }
   .avatar .number {
     position: absolute;
     top: 6px;
@@ -356,6 +366,7 @@
 <div id="modal-overlay">
   <div id="modal">
     <button id="modal-close">×</button>
+    <div id="modal-photo"></div>
     <h3 id="modal-name"></h3>
     <div class="sub" id="modal-sub"></div>
     <div class="section-title">今シーズン成績（7月5日現在）</div>
@@ -640,6 +651,13 @@ const lyricsLinks = {
   "髙寺 望夢":   "https://m.hanshintigers.jp/data/march/67.html",
 };
 
+// 球団公式サイトの選手写真（背番号ベース）。読み込めなければイニシャル表示のまま
+function photoTag(p) {
+  if (!/^\d+$/.test(p.number.replace(/^0+(?=\d)/, "0"))) return "";
+  const url = `https://hanshintigers.jp/data/img/player_images2026/${p.number}l.jpg`;
+  return `<img class="photo" src="${url}" alt="${p.name}" onerror="this.remove()">`;
+}
+
 function renderPlayers(list, containerId) {
   const container = document.getElementById(containerId);
   // 背番号順（番号不明の選手は最後に名前順）
@@ -662,6 +680,7 @@ function renderPlayers(list, containerId) {
     card.innerHTML = `
       <div class="avatar">
         <span class="initials">${p.initials}</span>
+        ${photoTag(p)}
         <span class="number">#${p.number}</span>
       </div>
       <div class="player-info">
@@ -981,6 +1000,8 @@ init();
 
 const overlay = document.getElementById('modal-overlay');
 function openModal(p) {
+  document.getElementById('modal-photo').innerHTML = photoTag(p)
+    .replace('class="photo"', 'style="width:110px;height:110px;object-fit:cover;object-position:top center;border-radius:8px;border:2px solid var(--tigers-yellow);float:left;margin:0 14px 8px 0;"');
   document.getElementById('modal-name').textContent = `${p.name}  #${p.number}`;
   document.getElementById('modal-sub').textContent = p.pos;
   document.getElementById('modal-season').textContent = p.season;
