@@ -1023,8 +1023,9 @@ const NPB = {
   pitching:  "https://npb.jp/bis/2026/stats/idp1_t.html",
 };
 
+// NPBの成績表は選手名の前に打席記号が付く（*＝左打、+＝両打）ので取り除く
 function normalize(s) {
-  return (s || "").replace(/[\s　*]/g, "");
+  return (s || "").replace(/[\s　*+＊＋]/g, "");
 }
 
 async function fetchMd(url) {
