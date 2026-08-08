@@ -250,6 +250,80 @@
     margin-top: 40px;
   }
 
+  /* 直近3試合 */
+  .game-row {
+    background: var(--gray);
+    border-left: 4px solid var(--tigers-yellow);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    transition: background 0.15s;
+  }
+  .game-row:hover { background: #3a3a3a; }
+  .game-row .date { color: #bbb; font-size: 0.8rem; }
+  .game-row .score { font-weight: bold; font-size: 1rem; }
+  .game-row .mark {
+    font-weight: bold;
+    border-radius: 4px;
+    padding: 1px 9px;
+    font-size: 0.85rem;
+  }
+  .mark.win { background: var(--tigers-yellow); color: #000; }
+  .mark.lose { background: #555; color: #ddd; }
+  .mark.draw { background: #777; color: #fff; }
+  .game-row .venue { color: #999; font-size: 0.78rem; }
+  .game-row .more { margin-left: auto; color: var(--tigers-yellow); font-size: 0.78rem; }
+
+  /* 試合成績のモーダル（選手モーダルと同じ見た目） */
+  #game-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 10;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  #game-overlay.open { display: flex; }
+  #game-modal {
+    background: var(--gray);
+    border: 3px solid var(--tigers-yellow);
+    border-radius: 12px;
+    max-width: 700px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 26px;
+    position: relative;
+  }
+  #game-modal h3 { color: var(--tigers-yellow); font-size: 1.3rem; margin-bottom: 4px; }
+  #game-modal .sub { color: #bbb; font-size: 0.85rem; margin-bottom: 14px; }
+  #game-modal .section-title {
+    color: var(--tigers-yellow);
+    font-size: 0.95rem;
+    margin: 16px 0 6px;
+    border-bottom: 1px solid #555;
+    padding-bottom: 3px;
+  }
+  #game-modal table { font-size: 0.8rem; min-width: 460px; }
+  #game-modal th, #game-modal td { padding: 5px 6px; }
+  #game-close {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    background: none;
+    border: none;
+    color: var(--tigers-yellow);
+    font-size: 1.6rem;
+    cursor: pointer;
+  }
+
   /* 表は狭い画面で横スクロール */
   .table-wrap {
     overflow-x: auto;
@@ -311,6 +385,11 @@
       </div>
       <div class="broadcast" id="live-note" style="margin-top:8px;"></div>
     </div>
+  </div>
+
+  <div id="recent-section" style="display:none;">
+    <h2>直近3試合の結果</h2>
+    <div id="recent-list"></div>
   </div>
 
   <h2>次の試合</h2>
@@ -375,6 +454,19 @@
   <h2>投手陣</h2>
   <div class="players" id="pitchers"></div>
 
+</div>
+
+<div id="game-overlay">
+  <div id="game-modal">
+    <button id="game-close">×</button>
+    <h3 id="game-title"></h3>
+    <div class="sub" id="game-sub"></div>
+    <div class="section-title">打撃成績（阪神）</div>
+    <div class="table-wrap"><table id="game-batting"></table></div>
+    <div class="section-title">投手成績（阪神）</div>
+    <div class="table-wrap"><table id="game-pitching"></table></div>
+    <div class="sub" style="margin-top:14px;">データ出典: スポーツナビ（Yahoo! JAPAN）</div>
+  </div>
 </div>
 
 <div id="modal-overlay">
@@ -1246,6 +1338,135 @@ async function updateLive() {
   if (status.includes("試合終了")) clearInterval(liveTimer);
 }
 
+// ===== 直近3試合の結果と、その試合の個人成績（スポーツナビより） =====
+const YAHOO_TEAM_ID = "5";   // スポーツナビの阪神のチームID
+const YAHOO_TEAM = "阪神";
+
+function stripLink(s) {
+  return (s || "").replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").trim();
+}
+
+// 見出し（##／###）付きでマークダウンの表を抽出する
+function parseSectionTables(md) {
+  const out = [];
+  let h2 = "", h3 = "", cur = null;
+  for (const line of md.split("\n")) {
+    const t = line.trim();
+    if (/^## /.test(t)) { h2 = t.replace(/^##\s*/, ""); h3 = ""; cur = null; continue; }
+    if (/^### /.test(t)) { h3 = t.replace(/^###\s*/, ""); cur = null; continue; }
+    if (/^\|/.test(t)) {
+      const cells = t.replace(/^\||\|$/g, "").split("|").map(c => c.trim());
+      if (cells.every(c => /^-+$/.test(c) || c === "")) continue;
+      if (!cur) { cur = { h2, h3, rows: [] }; out.push(cur); }
+      cur.rows.push(cells);
+    } else {
+      cur = null;
+    }
+  }
+  return out;
+}
+
+// 今週の日程ページから、終了した自チームの試合を拾う
+async function fetchRecentGames() {
+  const now = new Date();
+  const ymd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const md = await fetchMdFresh(`https://baseball.yahoo.co.jp/npb/schedule/?date=${ymd}`);
+  const games = [];
+  let date = "";
+  for (const line of md.split("\n")) {
+    const t = line.trim();
+    if (!/^\|/.test(t)) continue;
+    const cells = t.replace(/^\||\|$/g, "").split("|").map(c => c.trim());
+    let i = 0;
+    if (/^\d+月\d+日/.test(cells[0])) { date = cells[0]; i = 1; }
+    const body = cells[i] || "";
+    if (!body.includes(`/teams/${YAHOO_TEAM_ID}/`)) continue;
+    if (!/試合終了/.test(body)) continue;               // 試合前・中止は除く
+    const idM = body.match(/\/npb\/game\/(\d+)\//);
+    const scoreM = body.match(/(\d+)\s*-\s*(\d+)/);
+    const teams = [...body.matchAll(/\[([^\]]+)\]\(https:\/\/baseball\.yahoo\.co\.jp\/npb\/teams\/(\d+)\/index\)/g)];
+    if (!idM || !scoreM || teams.length < 2) continue;
+    games.push({
+      id: idM[1], date,
+      home: teams[0][1], away: teams[1][1],
+      homeScore: +scoreM[1], awayScore: +scoreM[2],
+      venue: stripLink(cells[i + 1] || ""),
+      isHome: teams[0][2] === YAHOO_TEAM_ID,
+    });
+  }
+  return games.slice(-3).reverse();   // 新しい順に3試合
+}
+
+function renderRecent(games) {
+  const sec = document.getElementById("recent-section");
+  const list = document.getElementById("recent-list");
+  if (!games.length) { sec.style.display = "none"; return; }
+  sec.style.display = "";
+  list.innerHTML = "";
+  games.forEach(g => {
+    const our = g.isHome ? g.homeScore : g.awayScore;
+    const opp = g.isHome ? g.awayScore : g.homeScore;
+    const [cls, mark] = our > opp ? ["win", "○"] : our < opp ? ["lose", "●"] : ["draw", "△"];
+    const row = document.createElement("div");
+    row.className = "game-row";
+    row.innerHTML =
+      `<span class="date">${g.date}</span>` +
+      `<span class="mark ${cls}">${mark}</span>` +
+      `<span class="score">${g.home} ${g.homeScore} - ${g.awayScore} ${g.away}</span>` +
+      `<span class="venue">${g.venue}</span>` +
+      `<span class="more">出場選手の成績 ›</span>`;
+    row.addEventListener("click", () => openGameStats(g));
+    list.appendChild(row);
+  });
+}
+
+// 指定の列だけを抜き出して表を描画
+function renderStatTable(tableEl, tbl, wanted) {
+  if (!tbl || tbl.rows.length < 2) {
+    tableEl.innerHTML = "<tbody><tr><td>データがありません</td></tr></tbody>";
+    return;
+  }
+  const head = tbl.rows[0];
+  const cols = wanted.map(w => head.indexOf(w)).filter(i => i >= 0);
+  let html = "<thead><tr>" +
+    cols.map(i => `<th>${head[i] || "勝敗"}</th>`).join("") + "</tr></thead><tbody>";
+  tbl.rows.slice(1).forEach(r => {
+    html += "<tr>" + cols.map(i => `<td>${stripLink(r[i] || "")}</td>`).join("") + "</tr>";
+  });
+  tableEl.innerHTML = html + "</tbody>";
+}
+
+const gameOverlay = document.getElementById("game-overlay");
+async function openGameStats(g) {
+  document.getElementById("game-title").textContent =
+    `${g.home} ${g.homeScore} - ${g.awayScore} ${g.away}`;
+  document.getElementById("game-sub").textContent = `${g.date}　${g.venue}`;
+  const bt = document.getElementById("game-batting");
+  const pt = document.getElementById("game-pitching");
+  bt.innerHTML = "<tbody><tr><td>読み込み中…</td></tr></tbody>";
+  pt.innerHTML = "";
+  gameOverlay.classList.add("open");
+  try {
+    const md = await fetchMdFresh(`https://baseball.yahoo.co.jp/npb/game/${g.id}/stats`);
+    const tables = parseSectionTables(md);
+    const bats = tables.filter(t => t.h2 === "打撃成績" && t.rows[0][0] === "位置");
+    const pits = tables.filter(t => t.h2 === "投手成績" && t.h3);
+    let idx = pits.findIndex(t => t.h3.includes(YAHOO_TEAM));
+    if (idx < 0) idx = g.isHome ? 1 : 0;   // 見出しで判定できない場合はホーム/ビジターで判断
+    renderStatTable(bt, bats[idx],
+      ["位置", "選手名", "打数", "安打", "打点", "本塁打", "三振", "四球", "盗塁", "打率"]);
+    renderStatTable(pt, pits[idx],
+      ["", "選手名", "投球回", "被安打", "奪三振", "与四球", "失点", "自責点", "防御率"]);
+  } catch (e) {
+    console.warn("試合成績の取得に失敗:", e);
+    bt.innerHTML = "<tbody><tr><td>成績を取得できませんでした</td></tr></tbody>";
+    pt.innerHTML = "";
+  }
+}
+document.getElementById("game-close").addEventListener("click", () => gameOverlay.classList.remove("open"));
+gameOverlay.addEventListener("click", e => { if (e.target === gameOverlay) gameOverlay.classList.remove("open"); });
+window.addEventListener("keydown", e => { if (e.key === "Escape") gameOverlay.classList.remove("open"); });
+
 let liveTimer = null;
 function startLive() {
   updateLive().catch(e => console.warn("速報取得に失敗:", e));
@@ -1270,6 +1491,7 @@ async function init() {
   renderPlayers(batters, 'batters');
   renderPlayers(pitchers, 'pitchers');
   startLive();
+  fetchRecentGames().then(renderRecent).catch(e => console.warn("直近試合の取得に失敗:", e));
 }
 init();
 
