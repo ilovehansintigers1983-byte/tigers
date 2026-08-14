@@ -313,6 +313,8 @@
   }
   #game-modal table { font-size: 0.8rem; min-width: 460px; }
   #game-modal th, #game-modal td { padding: 5px 6px; }
+  #game-modal .total-row { background: #4a4000; font-weight: bold; }
+  #game-modal .total-row td { color: var(--tigers-yellow); }
   #game-close {
     position: absolute;
     top: 10px;
@@ -1421,6 +1423,17 @@ function renderRecent(games) {
   });
 }
 
+// 打撃成績の「合計」行は打率の欄が無く1列ずれているため、位置を合わせ直す
+function alignTotalRow(r) {
+  if (r[0] !== "合計") return r;
+  if (!r[1] && r[2]) {
+    const out = [r[0], "", ""];
+    for (let i = 3; i <= r.length; i++) out[i] = r[i - 1];
+    return out;
+  }
+  return r;
+}
+
 // 指定の列だけを抜き出して表を描画
 function renderStatTable(tableEl, tbl, wanted) {
   if (!tbl || tbl.rows.length < 2) {
@@ -1431,8 +1444,11 @@ function renderStatTable(tableEl, tbl, wanted) {
   const cols = wanted.map(w => head.indexOf(w)).filter(i => i >= 0);
   let html = "<thead><tr>" +
     cols.map(i => `<th>${head[i] || "勝敗"}</th>`).join("") + "</tr></thead><tbody>";
-  tbl.rows.slice(1).forEach(r => {
-    html += "<tr>" + cols.map(i => `<td>${stripLink(r[i] || "")}</td>`).join("") + "</tr>";
+  tbl.rows.slice(1).forEach(raw => {
+    const isTotal = raw[0] === "合計";
+    const r = alignTotalRow(raw);
+    html += `<tr${isTotal ? ' class="total-row"' : ""}>` +
+      cols.map(i => `<td>${stripLink(r[i] || "")}</td>`).join("") + "</tr>";
   });
   tableEl.innerHTML = html + "</tbody>";
 }
